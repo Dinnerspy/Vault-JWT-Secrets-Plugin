@@ -1,0 +1,36 @@
+<?jelly escape-by-default='true'?>
+<j:jelly xmlns:j="jelly:core" xmlns:f="/lib/form">
+  <f:section title="Vault JWT Secrets">
+    <f:entry title="Vault URL" field="vaultUrl">
+      <f:textbox />
+    </f:entry>
+    <f:entry title="JWT auth path" field="authPath">
+      <f:textbox default="jwt" />
+    </f:entry>
+    <f:entry title="Default role" field="role">
+      <f:textbox />
+    </f:entry>
+    <f:entry title="Vault namespace" field="namespace">
+      <f:textbox />
+    </f:entry>
+    <f:entry title="Default KV v2 mount" field="defaultMount">
+      <f:textbox default="secret" />
+    </f:entry>
+    <f:advanced>
+      <f:entry title="Audience (aud claim)" field="audience">
+        <f:textbox />
+      </f:entry>
+      <f:entry title="CA certificate (PEM)" field="caCertificatePem">
+        <f:textarea />
+      </f:entry>
+      <f:entry title="Skip TLS verification" field="skipTlsVerify">
+        <f:checkbox />
+      </f:entry>
+      <f:entry title="Explicit id token credentials ID" field="idTokenCredentialsId">
+        <f:textbox />
+      </f:entry>
+    </f:advanced>
+    <f:validateButton title="Test connection" progress="Testing..." method="testConnection"
+        with="vaultUrl,authPath,role,namespace,caCertificatePem,skipTlsVerify,audience" />
+  </f:section>
+</j:jelly>

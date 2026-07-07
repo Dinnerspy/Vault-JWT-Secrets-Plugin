@@ -1,0 +1,44 @@
+services:
+  vault:
+    image: hashicorp/vault:1.18
+    container_name: vjs-vault
+    cap_add:
+      - IPC_LOCK
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: root
+      VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
+      VAULT_ADDR: http://127.0.0.1:8200
+    ports:
+      - "18200:8200"
+    networks:
+      - vjs
+    healthcheck:
+      test: ["CMD", "vault", "status", "-address=http://127.0.0.1:8200"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  jenkins:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vjs-jenkins
+    environment:
+      JAVA_OPTS: -Djenkins.install.runSetupWizard=false
+      CASC_JENKINS_CONFIG: /var/jenkins_home/casc.yaml
+    ports:
+      - "18080:8080"
+    networks:
+      - vjs
+    depends_on:
+      vault:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/login"]
+      interval: 5s
+      timeout: 3s
+      retries: 40
+
+networks:
+  vjs:
+    name: vjs

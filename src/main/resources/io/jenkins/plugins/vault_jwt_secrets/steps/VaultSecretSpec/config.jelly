@@ -1,0 +1,18 @@
+<?jelly escape-by-default='true'?>
+<j:jelly xmlns:j="jelly:core" xmlns:f="/lib/form">
+  <f:entry title="Path" field="path">
+    <f:textbox placeholder="production/db@ops" />
+  </f:entry>
+  <f:entry title="Field" field="field">
+    <f:textbox placeholder="password" />
+  </f:entry>
+  <f:entry title="Variable" field="var">
+    <f:textbox placeholder="DB_PASSWORD" />
+  </f:entry>
+  <f:entry title="Type" field="type">
+    <select name="type">
+      <option value="env" selected="${instance == null || instance.type == 'env' ? 'selected' : null}">Environment variable</option>
+      <option value="file" selected="${instance != null &amp;&amp; instance.type == 'file' ? 'selected' : null}">Temporary file (variable holds the path)</option>
+    </select>
+  </f:entry>
+</j:jelly>

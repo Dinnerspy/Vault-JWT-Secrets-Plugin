@@ -1,0 +1,8 @@
+<?jelly escape-by-default='true'?>
+<div>
+  Fetches HashiCorp Vault secrets in pipelines using short-lived per-build JWTs, modeled on
+  GitLab CI's <code>id_tokens</code> + <code>secrets:vault:</code> feature. Tokens are issued by the
+  OpenID Connect Provider plugin; Vault authorizes each build via its JWT auth method
+  (<code>bound_audiences</code> / <code>bound_claims</code>), so no long-lived Vault credential is
+  ever stored in Jenkins. Secret values are masked in console output.
+</div>

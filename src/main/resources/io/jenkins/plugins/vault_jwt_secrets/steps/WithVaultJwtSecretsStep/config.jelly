@@ -1,0 +1,26 @@
+<?jelly escape-by-default='true'?>
+<j:jelly xmlns:j="jelly:core" xmlns:f="/lib/form">
+  <f:entry title="Secrets" field="secrets">
+    <f:repeatableProperty field="secrets" minimum="1" />
+  </f:entry>
+  <f:entry title="Vault role" field="role">
+    <f:textbox />
+  </f:entry>
+  <f:advanced>
+    <f:entry title="Vault URL override" field="vaultUrl">
+      <f:textbox />
+    </f:entry>
+    <f:entry title="JWT auth path override" field="authPath">
+      <f:textbox />
+    </f:entry>
+    <f:entry title="Vault namespace override" field="namespace">
+      <f:textbox />
+    </f:entry>
+    <f:entry title="Audience override" field="audience">
+      <f:textbox />
+    </f:entry>
+    <f:entry title="Explicit id token credentials ID" field="idTokenCredentialsId">
+      <f:textbox />
+    </f:entry>
+  </f:advanced>
+</j:jelly>

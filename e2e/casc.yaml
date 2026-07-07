@@ -1,0 +1,75 @@
+jenkins:
+  systemMessage: "Vault JWT Secrets e2e"
+  numExecutors: 1
+  securityRealm:
+    local:
+      allowsSignup: false
+      users:
+        - id: admin
+          password: admin
+  authorizationStrategy:
+    loggedInUsersCanDoAnything:
+      allowAnonymousRead: false
+
+unclassified:
+  location:
+    url: "http://jenkins:8080/"
+  vaultJwtSecrets:
+    vaultUrl: "http://vault:8200"
+    role: "e2e"
+    defaultMount: "secret"
+    # Point at the pre-seeded id token credential below so the OIDC issuer/JWKS is
+    # published at boot (before Vault's oidc_discovery_url check runs). In normal use
+    # the plugin auto-provisions this lazily on first build.
+    idTokenCredentialsId: "e2e-oidc-token"
+
+credentials:
+  system:
+    domainCredentials:
+      - credentials:
+          - idToken:
+              scope: GLOBAL
+              id: "e2e-oidc-token"
+              description: "OIDC id token for Vault (e2e)"
+              audience: "http://vault:8200"
+          - vaultJwtSecret:
+              scope: GLOBAL
+              id: "e2e-db-password"
+              description: "Vault JWT secret credential (e2e)"
+              path: "production/db@secret"
+              field: "password"
+
+jobs:
+  - script: |
+      pipelineJob('vault-e2e') {
+        definition {
+          cps {
+            sandbox(true)
+            script('''
+              pipeline {
+                agent any
+                stages {
+                  stage('step-env') {
+                    steps {
+                      withVaultJwtSecrets(secrets: [
+                        vaultSecret(path: 'production/db@secret', field: 'password', var: 'DB_PASSWORD'),
+                        vaultSecret(path: 'production/db@secret', field: 'apikey',   var: 'API_FILE', type: 'file')
+                      ]) {
+                        sh 'echo "env secret is $DB_PASSWORD"'
+                        sh 'echo "file holds: $(cat $API_FILE)"'
+                      }
+                    }
+                  }
+                  stage('credential') {
+                    steps {
+                      withCredentials([string(credentialsId: 'e2e-db-password', variable: 'PW')]) {
+                        sh 'echo "credential secret is $PW"'
+                      }
+                    }
+                  }
+                }
+              }
+            '''.stripIndent())
+          }
+        }
+      }

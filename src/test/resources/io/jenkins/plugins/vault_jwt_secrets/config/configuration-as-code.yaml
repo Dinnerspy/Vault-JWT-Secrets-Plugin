@@ -1,0 +1,7 @@
+unclassified:
+  vaultJwtSecrets:
+    vaultUrl: "https://vault.example.com"
+    authPath: "jwt-jenkins"
+    role: "jenkins-default"
+    namespace: "team-a"
+    defaultMount: "kv"
