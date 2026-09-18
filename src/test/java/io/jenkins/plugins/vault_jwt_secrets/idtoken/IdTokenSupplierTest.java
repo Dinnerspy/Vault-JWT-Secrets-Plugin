@@ -3,6 +3,7 @@ package io.jenkins.plugins.vault_jwt_secrets.idtoken;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.cloudbees.hudson.plugins.folder.Folder;
 import com.cloudbees.plugins.credentials.SystemCredentialsProvider;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -65,6 +66,34 @@ class IdTokenSupplierTest {
         assertEquals(1, payload.path("build_number").asInt());
         // usage of the credential should be recorded on the build
         assertTrue(jwt.split("\\.").length == 3);
+    }
+
+    @Test
+    void mintForBuildCarriesJobAndFolderPathClaims(JenkinsRule r) throws Exception {
+        Folder team = r.jenkins.createProject(Folder.class, "team-a");
+        Folder backend = team.createProject(Folder.class, "backend");
+        FreeStyleProject project = backend.createProject(FreeStyleProject.class, "deploy");
+        FreeStyleBuild build = r.buildAndAssertSuccess(project);
+
+        VaultJwtConfig config = VaultJwtConfig.builder().vaultUrl(AUDIENCE).build();
+        JsonNode payload = JwtTestUtil.payload(IdTokenSupplier.mintForBuild(build, config));
+
+        assertEquals("team-a/backend/deploy", payload.path("job_path").asText());
+        assertEquals("team-a/backend", payload.path("folder_path").asText());
+        assertEquals("deploy", payload.path("job_name").asText());
+        assertEquals(
+                r.getURL() + "job/team-a/job/backend/job/deploy/",
+                payload.path("job_url").asText());
+    }
+
+    @Test
+    void folderPathIsEmptyForTopLevelJob(JenkinsRule r) throws Exception {
+        FreeStyleProject project = r.createFreeStyleProject("toplevel");
+        FreeStyleBuild build = r.buildAndAssertSuccess(project);
+        VaultJwtConfig config = VaultJwtConfig.builder().vaultUrl(AUDIENCE).build();
+        JsonNode payload = JwtTestUtil.payload(IdTokenSupplier.mintForBuild(build, config));
+        assertEquals("toplevel", payload.path("job_path").asText());
+        assertEquals("", payload.path("folder_path").asText());
     }
 
     @Test

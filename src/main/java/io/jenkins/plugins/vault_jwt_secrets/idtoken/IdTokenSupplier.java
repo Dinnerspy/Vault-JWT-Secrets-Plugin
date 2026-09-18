@@ -9,11 +9,18 @@ import edu.umd.cs.findbugs.annotations.NonNull;
 import hudson.AbortException;
 import hudson.model.Run;
 import io.jenkins.plugins.oidc_provider.IdTokenStringCredentials;
+import io.jenkins.plugins.oidc_provider.config.ClaimTemplate;
+import io.jenkins.plugins.oidc_provider.config.IdTokenConfiguration;
+import io.jenkins.plugins.oidc_provider.config.StringClaimType;
 import io.jenkins.plugins.vault_jwt_secrets.config.VaultJwtConfig;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -90,8 +97,41 @@ public final class IdTokenSupplier {
         // issuer intentionally left null: only default-issuer credentials are served by the root JWKS
         provider.getCredentials().add(credentials);
         provider.save();
+        ensureBuildClaimTemplates();
         LOGGER.log(Level.INFO, "Provisioned id token credentials {0} for audience {1}", new Object[] {id, audience});
         return id;
+    }
+
+    /**
+     * Enriches oidc-provider's build id tokens with job/folder identity claims (the Jenkins analog of
+     * GitLab's {@code project_path} / {@code namespace_path}), so Vault roles can bind on them. Claims are
+     * added additively and idempotently: any claim name the administrator already defined is left untouched.
+     * Backed by {@link VaultJwtEnvironmentContributor}, which guarantees these variables are always set.
+     */
+    static synchronized void ensureBuildClaimTemplates() {
+        Map<String, String> desired = new LinkedHashMap<>();
+        desired.put("job_path", "${" + VaultJwtEnvironmentContributor.ENV_JOB_PATH + "}");
+        desired.put("folder_path", "${" + VaultJwtEnvironmentContributor.ENV_FOLDER_PATH + "}");
+        desired.put("job_name", "${" + VaultJwtEnvironmentContributor.ENV_JOB_NAME + "}");
+        desired.put("job_url", "${JOB_URL}");
+        desired.put("build_url", "${BUILD_URL}");
+
+        IdTokenConfiguration config = IdTokenConfiguration.get();
+        List<ClaimTemplate> templates = new ArrayList<>(config.getBuildClaimTemplates());
+        boolean changed = false;
+        for (ClaimTemplate existing : templates) {
+            desired.remove(existing.name);
+        }
+        for (Map.Entry<String, String> e : desired.entrySet()) {
+            templates.add(new ClaimTemplate(e.getKey(), e.getValue(), new StringClaimType()));
+            changed = true;
+        }
+        if (changed) {
+            config.setBuildClaimTemplates(templates);
+            config.save();
+            LOGGER.log(
+                    Level.INFO, "Added Vault job identity claims to oidc-provider build tokens: {0}", desired.keySet());
+        }
     }
 
     @CheckForNull
