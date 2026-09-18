@@ -1,5 +1,5 @@
 jenkins:
-  systemMessage: "Vault JWT Secrets e2e"
+  systemMessage: "Vault JWT Secrets e2e — folder-driven config, no global block"
   numExecutors: 1
   securityRealm:
     local:
@@ -13,35 +13,43 @@ jenkins:
 
 unclassified:
   location:
+    # The only instance-wide setting the plugin needs: a root URL Vault can reach to
+    # fetch the OIDC discovery document. This is not Vault config — it is Jenkins' own URL.
     url: "http://jenkins:8080/"
-  vaultJwtSecrets:
-    vaultUrl: "http://vault:8200"
-    role: "e2e"
-    defaultMount: "secret"
-    # Point at the pre-seeded id token credential below so the OIDC issuer/JWKS is
-    # published at boot (before Vault's oidc_discovery_url check runs). In normal use
-    # the plugin auto-provisions this lazily on first build.
-    idTokenCredentialsId: "e2e-oidc-token"
+
+  # NOTE: there is intentionally NO global `vaultJwtSecrets:` block here.
+  # Vault connection settings (URL, role, mount, namespace) vary per team / per
+  # namespace / per role, so they live on the team's FOLDER — see the job-dsl below.
 
 credentials:
   system:
     domainCredentials:
       - credentials:
-          - idToken:
-              scope: GLOBAL
-              id: "e2e-oidc-token"
-              description: "OIDC id token for Vault (e2e)"
-              audience: "http://vault:8200"
+          # A Vault-backed string credential. It stores only path + field; the Vault
+          # connection (URL, role, mount) is resolved from the folder of whatever job
+          # uses it — here, team-a. In production you would scope this to the team folder.
           - vaultJwtSecret:
               scope: GLOBAL
-              id: "e2e-db-password"
-              description: "Vault JWT secret credential (e2e)"
+              id: "team-a-db-password"
+              description: "Vault JWT secret (resolves Vault via team-a folder config)"
               path: "production/db@secret"
               field: "password"
 
 jobs:
   - script: |
-      pipelineJob('vault-e2e') {
+      // The team's folder owns its Vault coordinates. Every job inside inherits them;
+      // nothing about Vault is declared at the Jenkins-instance level.
+      folder('team-a') {
+        description('Team A — owns its Vault coordinates (URL, role, mount)')
+        configure { node ->
+          node / 'properties' / 'io.jenkins.plugins.vault__jwt__secrets.config.VaultJwtFolderProperty' {
+            vaultUrl('http://vault:8200')
+            role('e2e')
+            defaultMount('secret')
+          }
+        }
+      }
+      pipelineJob('team-a/deploy') {
         definition {
           cps {
             sandbox(true)
@@ -51,18 +59,47 @@ jobs:
                 stages {
                   stage('step-env') {
                     steps {
+                      // No vaultUrl / role / mount here: all inherited from the team-a folder.
+                      // A job that needed a different role would add role: '...' to override.
+                      // GitLab's one-line notation: the last path segment is the field.
                       withVaultJwtSecrets(secrets: [
-                        vaultSecret(path: 'production/db@secret', field: 'password', var: 'DB_PASSWORD'),
-                        vaultSecret(path: 'production/db@secret', field: 'apikey',   var: 'API_FILE', type: 'file')
+                        vaultSecret(path: 'production/db/password@secret', var: 'DB_PASSWORD'),
+                        vaultSecret(path: 'production/db/apikey@secret',   var: 'API_FILE', type: 'file')
                       ]) {
                         sh 'echo "env secret is $DB_PASSWORD"'
                         sh 'echo "file holds: $(cat $API_FILE)"'
                       }
                     }
                   }
+                  stage('gitlab-style-env') {
+                    steps {
+                      // GitLab configures Vault through CI/CD variables; the same names work here.
+                      // VAULT_AUTH_ROLE overrides the role the team-a folder set.
+                      withEnv(['VAULT_AUTH_ROLE=e2e-env']) {
+                        withVaultJwtSecrets(secrets: [
+                          vaultSecret(path: 'production/db/password@secret', var: 'PW2')
+                        ]) {
+                          sh 'echo "env-configured secret is $PW2"'
+                        }
+                      }
+                    }
+                  }
+                  stage('raw-token') {
+                    steps {
+                      // The Jenkins analog of GitLab's `id_tokens:` — take the JWT itself and
+                      // drive the Vault login by hand. Audience and role come from Jenkins env
+                      // vars; ${VAULT_ADDR} is expanded when the token is minted.
+                      withEnv(['VAULT_ADDR=http://vault:8200', 'VAULT_ROLE=e2e']) {
+                        withVaultJwtToken(audience: '${VAULT_ADDR}') {
+                          sh 'echo "raw token is $VAULT_ID_TOKEN"'
+                          sh '/usr/local/bin/manual-vault-login.sh'
+                        }
+                      }
+                    }
+                  }
                   stage('credential') {
                     steps {
-                      withCredentials([string(credentialsId: 'e2e-db-password', variable: 'PW')]) {
+                      withCredentials([string(credentialsId: 'team-a-db-password', variable: 'PW')]) {
                         sh 'echo "credential secret is $PW"'
                       }
                     }

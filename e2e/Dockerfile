@@ -18,4 +18,9 @@ RUN jenkins-plugin-cli --plugins \
 
 COPY --chown=jenkins:jenkins casc.yaml /var/jenkins_home/casc.yaml
 
+USER root
+COPY manual-vault-login.sh /usr/local/bin/manual-vault-login.sh
+RUN chmod 0755 /usr/local/bin/manual-vault-login.sh
+USER jenkins
+
 ENV JENKINS_OPTS="--prefix="

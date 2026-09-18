@@ -34,16 +34,34 @@ run sh -c 'vault policy write e2e - <<EOF
 path "secret/data/production/db" { capabilities = ["read"] }
 EOF'
 
-echo "Creating role 'e2e' bound to the Jenkins job identity..."
-# Pass the whole role as a JSON body on stdin so the nested bound_claims object
-# survives docker exec shell quoting intact.
+echo "Creating role 'e2e' bound to the team-a FOLDER identity..."
+# Authorize by the plugin's enriched `folder_path` claim (the Jenkins analog of GitLab's
+# namespace_path): any job under the team-a folder may assume this role, regardless of its
+# leaf job name. Pass the whole role as a JSON body on stdin so the nested bound_claims
+# object survives docker exec shell quoting intact.
 run sh -c "vault write auth/jwt/role/e2e - <<'EOF'
 {
   \"role_type\": \"jwt\",
   \"user_claim\": \"sub\",
   \"bound_audiences\": \"${VAULT_AUDIENCE}\",
   \"bound_claims_type\": \"glob\",
-  \"bound_claims\": { \"sub\": \"http://jenkins:8080/job/*\" },
+  \"bound_claims\": { \"folder_path\": \"team-a*\" },
+  \"token_policies\": \"e2e\",
+  \"token_ttl\": \"120s\",
+  \"token_num_uses\": 5
+}
+EOF"
+
+# A second, identical role. The pipeline reaches it only via the GitLab-compatible
+# VAULT_AUTH_ROLE variable, proving that env-var config overrides the folder's role.
+echo "Creating role 'e2e-env' (selected via VAULT_AUTH_ROLE)..."
+run sh -c "vault write auth/jwt/role/e2e-env - <<'EOF'
+{
+  \"role_type\": \"jwt\",
+  \"user_claim\": \"sub\",
+  \"bound_audiences\": \"${VAULT_AUDIENCE}\",
+  \"bound_claims_type\": \"glob\",
+  \"bound_claims\": { \"folder_path\": \"team-a*\" },
   \"token_policies\": \"e2e\",
   \"token_ttl\": \"120s\",
   \"token_num_uses\": 5
