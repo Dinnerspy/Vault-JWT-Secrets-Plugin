@@ -46,6 +46,29 @@ public final class KvV2Ref implements Serializable {
         return new KvV2Ref(mount, path);
     }
 
+    /**
+     * Splits GitLab's one-line secret notation, in which the last path segment names the field:
+     * {@code production/db/password@ops} → {@code ["production/db@ops", "password"]}. Used when no
+     * explicit field is given.
+     */
+    @NonNull
+    public static String[] splitTrailingField(@NonNull String spec) {
+        String body = spec;
+        String mountSuffix = "";
+        int at = spec.lastIndexOf('@');
+        if (at >= 0) {
+            body = spec.substring(0, at);
+            mountSuffix = spec.substring(at);
+        }
+        int slash = body.lastIndexOf('/');
+        if (slash <= 0 || slash == body.length() - 1) {
+            throw new IllegalArgumentException("Cannot tell which field to read from '" + spec
+                    + "'. Either pass field: '...', or use GitLab's one-line form where the last path"
+                    + " segment is the field, e.g. 'production/db/password@ops'.");
+        }
+        return new String[] {body.substring(0, slash) + mountSuffix, body.substring(slash + 1)};
+    }
+
     private static void validateSegment(String what, String segment) {
         if (segment.isBlank()) {
             throw new IllegalArgumentException("Empty " + what + " in Vault secret reference");

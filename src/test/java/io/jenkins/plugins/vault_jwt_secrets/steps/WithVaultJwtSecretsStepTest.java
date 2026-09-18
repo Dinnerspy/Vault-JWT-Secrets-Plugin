@@ -164,6 +164,78 @@ class WithVaultJwtSecretsStepTest {
     }
 
     @Test
+    void gitlabOneLinePathInfersTheField(JenkinsRule r, WireMockRuntimeInfo wm) throws Exception {
+        stubVault(wm);
+        configureGlobal(wm);
+        WorkflowJob job = r.createProject(WorkflowJob.class, "shorthand");
+        job.setDefinition(new CpsFlowDefinition(
+                "node {\n"
+                        + "  withVaultJwtSecrets(secrets: [vaultSecret(path: 'production/db/password@ops', var: 'PW')]) {\n"
+                        + "    sh 'echo got $PW'\n"
+                        + "  }\n"
+                        + "}",
+                true));
+        WorkflowRun build = r.buildAndAssertSuccess(job);
+        r.assertLogContains("got ****", build);
+        r.assertLogNotContains(SECRET_VALUE, build);
+    }
+
+    @Test
+    void gitlabVaultEnvironmentVariablesConfigureTheStep(JenkinsRule r, WireMockRuntimeInfo wm) throws Exception {
+        stubVault(wm);
+        // nothing configured globally or on a folder: the GitLab variable names carry the whole config
+        WorkflowJob job = r.createProject(WorkflowJob.class, "envconfig");
+        job.setDefinition(new CpsFlowDefinition(
+                "node {\n"
+                        + "  withEnv(['VAULT_SERVER_URL=" + wm.getHttpBaseUrl() + "', 'VAULT_AUTH_ROLE=demo']) {\n"
+                        + "    withVaultJwtSecrets(secrets: [vaultSecret(path: 'production/db/password@ops', var: 'PW')]) {\n"
+                        + "      sh 'echo got $PW'\n"
+                        + "    }\n"
+                        + "  }\n"
+                        + "}",
+                true));
+        WorkflowRun build = r.buildAndAssertSuccess(job);
+        r.assertLogContains("got ****", build);
+
+        List<LoggedRequest> logins = wm.getWireMock()
+                .find(com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor(
+                        urlEqualTo("/v1/auth/jwt/login")));
+        assertEquals(1, logins.size());
+        assertEquals(
+                "demo",
+                new ObjectMapper()
+                        .readTree(logins.get(0).getBodyAsString())
+                        .path("role")
+                        .asText());
+    }
+
+    @Test
+    void stepParameterBeatsTheGitlabEnvironmentVariable(JenkinsRule r, WireMockRuntimeInfo wm) throws Exception {
+        stubVault(wm);
+        WorkflowJob job = r.createProject(WorkflowJob.class, "envprecedence");
+        job.setDefinition(new CpsFlowDefinition(
+                "node {\n"
+                        + "  withEnv(['VAULT_SERVER_URL=" + wm.getHttpBaseUrl() + "', 'VAULT_AUTH_ROLE=from-env']) {\n"
+                        + "    withVaultJwtSecrets(role: 'from-step',\n"
+                        + "        secrets: [vaultSecret(path: 'production/db@ops', field: 'password', var: 'PW')]) {\n"
+                        + "      sh 'echo got $PW'\n"
+                        + "    }\n"
+                        + "  }\n"
+                        + "}",
+                true));
+        r.buildAndAssertSuccess(job);
+        List<LoggedRequest> logins = wm.getWireMock()
+                .find(com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor(
+                        urlEqualTo("/v1/auth/jwt/login")));
+        assertEquals(
+                "from-step",
+                new ObjectMapper()
+                        .readTree(logins.get(0).getBodyAsString())
+                        .path("role")
+                        .asText());
+    }
+
+    @Test
     void declarativeOptionsBlockWorks(JenkinsRule r, WireMockRuntimeInfo wm) throws Exception {
         stubVault(wm);
         configureGlobal(wm);

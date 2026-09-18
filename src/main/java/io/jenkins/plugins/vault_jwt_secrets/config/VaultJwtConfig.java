@@ -2,7 +2,9 @@ package io.jenkins.plugins.vault_jwt_secrets.config;
 
 import edu.umd.cs.findbugs.annotations.CheckForNull;
 import edu.umd.cs.findbugs.annotations.NonNull;
+import hudson.Util;
 import java.io.Serializable;
+import java.util.Map;
 
 /**
  * Effective Vault connection settings. All fields are nullable so that partially filled
@@ -63,6 +65,30 @@ public final class VaultJwtConfig implements Serializable {
 
     private static String pick(@CheckForNull String inner, @CheckForNull String outer) {
         return inner != null && !inner.isBlank() ? inner : outer;
+    }
+
+    /**
+     * Returns a config in which {@code ${VAR}} references in the connection settings are replaced with
+     * values from the build environment, so that e.g. {@code audience: '${VAULT_ADDR}'} works the same
+     * way the oidc-provider plugin substitutes variables into its claim templates. Unknown variables are
+     * left untouched. The CA certificate is deliberately not expanded — PEM text is data, not a template.
+     */
+    @NonNull
+    public VaultJwtConfig expandedWith(@CheckForNull Map<String, String> env) {
+        if (env == null || env.isEmpty()) {
+            return this;
+        }
+        Builder b = new Builder();
+        b.vaultUrl = Util.replaceMacro(vaultUrl, env);
+        b.authPath = Util.replaceMacro(authPath, env);
+        b.role = Util.replaceMacro(role, env);
+        b.namespace = Util.replaceMacro(namespace, env);
+        b.defaultMount = Util.replaceMacro(defaultMount, env);
+        b.caCertificatePem = caCertificatePem;
+        b.skipTlsVerify = skipTlsVerify;
+        b.audience = Util.replaceMacro(audience, env);
+        b.idTokenCredentialsId = Util.replaceMacro(idTokenCredentialsId, env);
+        return new VaultJwtConfig(b);
     }
 
     @CheckForNull

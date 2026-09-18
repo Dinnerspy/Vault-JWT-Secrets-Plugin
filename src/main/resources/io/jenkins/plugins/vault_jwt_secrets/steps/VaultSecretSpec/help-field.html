@@ -1,1 +1,6 @@
-<div>Key within the secret whose value is exposed, for example <code>password</code>.</div>
+<div>
+  Key within the secret whose value is exposed, for example <code>password</code>. Optional: leave it empty
+  and the last segment of the path names the field, exactly as in GitLab —
+  <code>production/db/password@ops</code> reads the <code>password</code> key of
+  <code>ops/data/production/db</code>.
+</div>

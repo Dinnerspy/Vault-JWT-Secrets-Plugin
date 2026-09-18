@@ -171,8 +171,16 @@ public class WithVaultJwtSecretsStep extends Step {
                 if (!vars.add(spec.getVar())) {
                     throw new AbortException("withVaultJwtSecrets: variable '" + spec.getVar() + "' is used twice");
                 }
+                try {
+                    spec.effectiveField();
+                } catch (IllegalArgumentException x) {
+                    throw new AbortException("withVaultJwtSecrets: " + x.getMessage());
+                }
             }
-            VaultJwtConfig config = VaultConfigResolver.resolve(run, step.toOverrides());
+            // ${VAR} references in the connection settings (audience, vaultUrl, role, ...) are expanded
+            // against the build environment, so a Jenkinsfile can parameterise them like oidc-provider does.
+            VaultJwtConfig config = VaultConfigResolver.resolve(
+                    run, step.toOverrides(), getContext().get(EnvVars.class));
 
             Map<String, String> env = new LinkedHashMap<>();
             List<String> secretValues = new ArrayList<>();
@@ -191,7 +199,8 @@ public class WithVaultJwtSecretsStep extends Step {
             try {
                 Map<KvV2Ref, Map<String, String>> fetched = new HashMap<>();
                 for (VaultSecretSpec spec : step.getSecrets()) {
-                    KvV2Ref ref = KvV2Ref.parse(spec.getPath(), config.getEffectiveDefaultMount());
+                    KvV2Ref ref = KvV2Ref.parse(spec.effectivePath(), config.getEffectiveDefaultMount());
+                    String fieldName = spec.effectiveField();
                     Map<String, String> data = fetched.get(ref);
                     if (data == null) {
                         try {
@@ -201,11 +210,10 @@ public class WithVaultJwtSecretsStep extends Step {
                         }
                         fetched.put(ref, data);
                     }
-                    String value = data.get(spec.getField());
+                    String value = data.get(fieldName);
                     if (value == null) {
-                        throw new AbortException("withVaultJwtSecrets: field '" + spec.getField()
-                                + "' not found in " + ref + ". Available fields: "
-                                + String.join(", ", data.keySet()));
+                        throw new AbortException("withVaultJwtSecrets: field '" + fieldName + "' not found in " + ref
+                                + ". Available fields: " + String.join(", ", data.keySet()));
                     }
                     secretValues.add(value);
                     if (spec.isFile()) {
@@ -269,6 +277,11 @@ public class WithVaultJwtSecretsStep extends Step {
         @Override
         public void expand(@NonNull EnvVars env) {
             overrides.forEach((key, value) -> env.override(key, value.getPlainText()));
+        }
+
+        @Override
+        public Set<String> getSensitiveVariables() {
+            return overrides.keySet();
         }
     }
 

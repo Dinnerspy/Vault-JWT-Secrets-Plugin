@@ -1,10 +1,10 @@
 <?jelly escape-by-default='true'?>
 <j:jelly xmlns:j="jelly:core" xmlns:f="/lib/form">
   <f:entry title="Path" field="path">
-    <f:textbox placeholder="production/db@ops" />
+    <f:textbox placeholder="production/db/password@ops" />
   </f:entry>
-  <f:entry title="Field" field="field">
-    <f:textbox placeholder="password" />
+  <f:entry title="Field (optional)" field="field">
+    <f:textbox placeholder="taken from the end of the path" />
   </f:entry>
   <f:entry title="Variable" field="var">
     <f:textbox placeholder="DB_PASSWORD" />

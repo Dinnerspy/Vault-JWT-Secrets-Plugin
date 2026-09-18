@@ -7,6 +7,7 @@ import edu.umd.cs.findbugs.annotations.CheckForNull;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import hudson.Extension;
 import hudson.model.Run;
+import hudson.model.TaskListener;
 import hudson.util.FormValidation;
 import hudson.util.Secret;
 import io.jenkins.plugins.vault_jwt_secrets.config.VaultConfigResolver;
@@ -47,18 +48,31 @@ public class VaultJwtSecretCredentials extends BaseStandardCredentials implement
             @CheckForNull String id,
             @CheckForNull String description,
             @NonNull String path,
-            @NonNull String field) {
+            @CheckForNull String field) {
         super(scope, id, description);
         this.path = path.trim();
-        this.field = field.trim();
+        this.field = field == null || field.isBlank() ? null : field.trim();
     }
 
     public String getPath() {
         return path;
     }
 
+    @CheckForNull
     public String getField() {
         return field;
+    }
+
+    /** The secret path with the field stripped off (GitLab's one-line form when no field is set). */
+    @NonNull
+    public String effectivePath() {
+        return field != null ? path : KvV2Ref.splitTrailingField(path)[0];
+    }
+
+    /** The field to read: the explicit one, else the last segment of {@code path}. */
+    @NonNull
+    public String effectiveField() {
+        return field != null ? field : KvV2Ref.splitTrailingField(path)[1];
     }
 
     @CheckForNull
@@ -138,7 +152,8 @@ public class VaultJwtSecretCredentials extends BaseStandardCredentials implement
             VaultJwtConfig config;
             String jwt;
             if (build != null) {
-                config = VaultConfigResolver.resolve(build, overrides);
+                // ${VAR} references in the connection settings resolve against the build environment
+                config = VaultConfigResolver.resolve(build, overrides, build.getEnvironment(TaskListener.NULL));
                 jwt = IdTokenSupplier.mintForBuild(build, config);
             } else {
                 // outside a build (e.g. form validation): non-build claims, global+override config only
@@ -151,12 +166,13 @@ public class VaultJwtSecretCredentials extends BaseStandardCredentials implement
             // config is validated: role is guaranteed non-null
             String token = client.loginWithJwt(jwt, Objects.requireNonNull(config.getRole()));
             try {
-                KvV2Ref ref = KvV2Ref.parse(path, config.getEffectiveDefaultMount());
+                KvV2Ref ref = KvV2Ref.parse(effectivePath(), config.getEffectiveDefaultMount());
                 Map<String, String> data = client.readKvV2(token, ref);
-                String value = data.get(field);
+                String fieldName = effectiveField();
+                String value = data.get(fieldName);
                 if (value == null) {
-                    throw new IllegalStateException("field '" + field + "' not found in " + ref + ". Available fields: "
-                            + String.join(", ", data.keySet()));
+                    throw new IllegalStateException("field '" + fieldName + "' not found in " + ref
+                            + ". Available fields: " + String.join(", ", data.keySet()));
                 }
                 return Secret.fromString(value);
             } finally {
@@ -192,8 +208,16 @@ public class VaultJwtSecretCredentials extends BaseStandardCredentials implement
             }
         }
 
-        public FormValidation doCheckField(@QueryParameter String value) {
-            return value == null || value.isBlank() ? FormValidation.error("Field is required") : FormValidation.ok();
+        public FormValidation doCheckField(@QueryParameter String value, @QueryParameter String path) {
+            if (value != null && !value.isBlank()) {
+                return FormValidation.ok();
+            }
+            try {
+                String inferred = KvV2Ref.splitTrailingField(path == null ? "" : path.trim())[1];
+                return FormValidation.ok("Reading field '" + inferred + "' from the end of the path.");
+            } catch (IllegalArgumentException x) {
+                return FormValidation.error(x.getMessage());
+            }
         }
     }
 }

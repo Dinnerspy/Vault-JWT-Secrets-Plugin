@@ -1,5 +1,6 @@
 package io.jenkins.plugins.vault_jwt_secrets.vault;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -42,6 +43,19 @@ class KvV2RefTest {
         assertThrows(IllegalArgumentException.class, () -> KvV2Ref.parse("a@", "secret"));
         assertThrows(IllegalArgumentException.class, () -> KvV2Ref.parse("/a@ops", "secret"));
         assertThrows(IllegalArgumentException.class, () -> KvV2Ref.parse("a/@ops", "secret"));
+    }
+
+    @Test
+    void splitsGitlabTrailingFieldNotation() {
+        assertArrayEquals(
+                new String[] {"production/db@ops", "password"},
+                KvV2Ref.splitTrailingField("production/db/password@ops"));
+        assertArrayEquals(
+                new String[] {"production/db", "password"}, KvV2Ref.splitTrailingField("production/db/password"));
+        // no separator to split on, and no trailing field to take
+        assertThrows(IllegalArgumentException.class, () -> KvV2Ref.splitTrailingField("db@ops"));
+        assertThrows(IllegalArgumentException.class, () -> KvV2Ref.splitTrailingField("a/@ops"));
+        assertThrows(IllegalArgumentException.class, () -> KvV2Ref.splitTrailingField(""));
     }
 
     @Test
