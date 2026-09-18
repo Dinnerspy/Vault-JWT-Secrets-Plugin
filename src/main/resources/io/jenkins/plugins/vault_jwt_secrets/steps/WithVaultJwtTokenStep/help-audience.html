@@ -1,0 +1,7 @@
+<div>
+  The token's <code>aud</code> claim — what the receiving service must be configured to accept
+  (<code>bound_audiences</code> in a Vault JWT role). Defaults to the Vault URL resolved from the folder
+  or global configuration. May reference build environment variables, e.g.
+  <code>${VAULT_ADDR}</code> or <code>https://vault.corp/${TEAM}</code>; unknown variables are left as-is.
+  One signing keypair (and JWKS <code>kid</code>) is provisioned per distinct audience.
+</div>

@@ -1,0 +1,6 @@
+<div>
+  Mints a per-build ID token (JWT) and exposes it as an environment variable inside the block, masked in
+  the console log. The Jenkins analog of GitLab CI's <code>id_tokens:</code> — use it when you want to
+  drive the Vault login yourself, or hand the token to another service that trusts this Jenkins as an
+  OIDC issuer. To have secrets fetched for you, use <code>withVaultJwtSecrets</code> instead.
+</div>
