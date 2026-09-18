@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        jdk: [17, 21]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.jdk }}
+          cache: maven
+      # tests + spotless + spotbugs + package; gitHubRepo points the plugin's URL at this repository
+      - run: mvn -B -ntp -DgitHubRepo="$GITHUB_REPOSITORY" verify
+      - uses: actions/upload-artifact@v4
+        if: matrix.jdk == 17
+        with:
+          name: vault-jwt-secrets-snapshot
+          path: target/vault-jwt-secrets.hpi
+          if-no-files-found: error
