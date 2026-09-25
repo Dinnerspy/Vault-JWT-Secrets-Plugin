@@ -235,6 +235,33 @@ vault write auth/jwt/role/myapp-deploy \
     token_num_uses=3
 ```
 
+### Bootstrapping the issuer (read before step 1)
+
+Jenkins only serves `/oidc/.well-known/openid-configuration` and `/oidc/jwks` once at least one id-token
+credential exists, and this plugin auto-provisions that credential on the **first build** that needs it. Vault,
+however, fetches `oidc_discovery_url` when you write `auth/jwt/config` and refuses the write if it is not
+reachable. So on a fresh Jenkins, publish the issuer first — any one of:
+
+- **Manage Jenkins » System » Vault JWT Secrets**: enter the Vault URL and any role name and click
+  **Test connection**. The JWT login will fail (Vault is not configured yet) but the id-token credential is
+  provisioned as a side effect. You can clear the fields afterwards if you configure per folder.
+- Run any pipeline that calls `withVaultJwtSecrets` / `withVaultJwtToken` once; it fails at the Vault login
+  for the same reason, but leaves the issuer published.
+- Script console: `io.jenkins.plugins.vault_jwt_secrets.idtoken.IdTokenSupplier.getOrCreateIdTokenCredentials('https://vault.example.com')`
+  (this is what the e2e harness does).
+
+Then verify from the Vault host — no authentication is required, the endpoints are public:
+
+```sh
+curl -s https://jenkins.example.com/oidc/.well-known/openid-configuration   # must list "jwks_uri"
+curl -s https://jenkins.example.com/oidc/jwks                               # one key per audience
+```
+
+Things that make Vault reject the token even when discovery works: `bound_issuer` must equal the Jenkins
+root URL + `oidc` exactly (scheme, host, port, no trailing slash); `bound_audiences` must equal the plugin's
+`vaultUrl` / `audience` exactly as configured; if Jenkins uses a private CA, pass it via
+`oidc_discovery_ca_pem`; a reverse proxy in front of Jenkins must let `/oidc/*` through unauthenticated.
+
 ### JWT claims available for `bound_claims`
 
 Besides the standard `sub` = job URL, `aud` = Vault URL, and `iss` = `${JENKINS_URL}oidc`, the plugin
