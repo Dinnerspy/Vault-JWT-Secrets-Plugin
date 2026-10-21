@@ -132,8 +132,8 @@ public class WithVaultJwtTokenStep extends Step {
             // token for a service that is not Vault at all.
             VaultJwtConfig config = VaultConfigResolver.resolveForToken(
                     run, step.toOverrides(), getContext().get(EnvVars.class));
-            if (config.getEffectiveAudience() == null
-                    || config.getEffectiveAudience().isBlank()) {
+            String audience = config.getEffectiveAudience();
+            if (audience == null || audience.isBlank()) {
                 throw new AbortException("withVaultJwtToken: no audience. Pass audience: '...' (a ${VAR} reference"
                         + " is expanded against the build environment), or configure a Vault URL on the folder"
                         + " or globally so the audience can default to it.");
@@ -141,8 +141,8 @@ public class WithVaultJwtTokenStep extends Step {
             String jwt = IdTokenSupplier.mintForBuild(run, config);
 
             listener.getLogger()
-                    .println("[withVaultJwtToken] Minted a per-build id token for audience "
-                            + config.getEffectiveAudience() + "; available as $" + var + " (masked).");
+                    .println("[withVaultJwtToken] Minted a per-build id token for audience " + audience
+                            + "; available as $" + var + " (masked).");
 
             getContext()
                     .newBodyInvoker()

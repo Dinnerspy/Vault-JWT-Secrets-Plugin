@@ -23,6 +23,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.logging.Level;
@@ -190,7 +191,8 @@ public class WithVaultJwtSecretsStep extends Step {
             VaultClient client = new VaultClient(config);
             String token;
             try {
-                token = client.loginWithJwt(jwt, config.getRole());
+                // VaultConfigResolver.resolve has already rejected a missing role
+                token = client.loginWithJwt(jwt, Objects.requireNonNull(config.getRole()));
             } catch (VaultClientException x) {
                 throw new AbortException("withVaultJwtSecrets: " + x.getMessage()
                         + " — check the Vault role's bound_audiences/bound_claims and that Vault can reach"
