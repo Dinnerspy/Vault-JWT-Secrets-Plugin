@@ -9,3 +9,4 @@ work/
 .project
 .settings/
 e2e/.workdir/
+.claude/settings.local.json

@@ -33,7 +33,7 @@
 
   <properties>
     <changelist>999999-SNAPSHOT</changelist>
-    <gitHubRepo>jenkinsci/vault-jwt-secrets-plugin</gitHubRepo>
+    <gitHubRepo>Dinnerspy/Vault-JWT-Secrets-Plugin</gitHubRepo>
     <jenkins.baseline>2.541</jenkins.baseline>
     <jenkins.version>${jenkins.baseline}.3</jenkins.version>
     <spotless.check.skip>false</spotless.check.skip>

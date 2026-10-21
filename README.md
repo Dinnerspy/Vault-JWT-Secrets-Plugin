@@ -10,6 +10,9 @@ plugin). Vault verifies that token against Jenkins' OIDC discovery endpoint and 
 JWT auth role (`bound_audiences`, `bound_claims`) — which builds may read which secrets. **No standing Vault
 credential is ever stored in Jenkins.** Secret values are masked in the console log.
 
+> **Note:** This plugin is being developed with the help of [Claude Code](https://claude.com/claude-code),
+> Anthropic's AI coding assistant. All changes are reviewed and tested before release.
+
 ## Why not the existing hashicorp-vault-plugin?
 
 That plugin authenticates with static credentials (AppRole role-id/secret-id, tokens). Those are standing
@@ -29,7 +32,7 @@ so a leak is short-lived and authorization is enforced per-job on the Vault side
 
 The plugin is not in the Jenkins update center yet, so install the `.hpi` directly:
 
-1. Download `vault-jwt-secrets.hpi` from this repository's **Releases** page (or build it — see
+1. Download `vault-jwt-secrets.hpi` from the [Releases](https://github.com/Dinnerspy/Vault-JWT-Secrets-Plugin/releases) page (or build it — see
    [Building](#building)).
 2. **Manage Jenkins » Plugins » Advanced settings » Deploy Plugin**, choose the file, and restart when
    prompted. Jenkins pulls the OpenID Connect Provider dependency from the update center automatically.
@@ -42,7 +45,7 @@ FROM jenkins/jenkins:lts-jdk17
 RUN jenkins-plugin-cli --plugins oidc-provider workflow-aggregator \
     credentials credentials-binding plain-credentials cloudbees-folder
 ADD --chown=jenkins:jenkins \
-    https://github.com/<owner>/vault-jwt-secrets-plugin/releases/download/v<version>/vault-jwt-secrets.hpi \
+    https://github.com/Dinnerspy/Vault-JWT-Secrets-Plugin/releases/download/v<version>/vault-jwt-secrets.hpi \
     /usr/share/jenkins/ref/plugins/vault-jwt-secrets.jpi
 ```
 
