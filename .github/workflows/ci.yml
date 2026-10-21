@@ -30,3 +30,21 @@ jobs:
           name: vault-jwt-secrets-snapshot
           path: target/vault-jwt-secrets.hpi
           if-no-files-found: error
+
+  # Real Jenkins + Vault in Docker: JWT login, KV v2 reads and log masking (see e2e/run.sh).
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: maven
+      - run: mvn -B -ntp -DskipTests package
+      - run: SKIP_BUILD=1 bash e2e/run.sh
+      - name: Container logs
+        if: failure()
+        run: |
+          docker logs vjs-jenkins 2>&1 | tail -200 || true
+          docker logs vjs-vault 2>&1 | tail -100 || true
