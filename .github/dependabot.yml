@@ -1,0 +1,20 @@
+version: 2
+updates:
+  - package-ecosystem: maven
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      maven:
+        patterns: ['*']
+    ignore:
+      # Newer oidc-provider releases raise the required Jenkins core above our 2.541.3 baseline;
+      # bump it by hand together with jenkins.baseline and the BOM.
+      - dependency-name: io.jenkins.plugins:oidc-provider
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ['*']
